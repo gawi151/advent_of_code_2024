@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:day1/day1.dart';
 
 void main(List<String> arguments) async {
-  final file = File('input.txt');
+  final file = File('day1_input.txt');
   final lines = await file.readAsLines();
 
   // create lists
