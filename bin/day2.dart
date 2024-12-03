@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:aoc2024/day2.dart';
 
 void main(List<String> arguments) async {
