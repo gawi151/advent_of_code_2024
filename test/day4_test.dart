@@ -24,12 +24,31 @@ MXMXAXMASX'''
     final file = File('day4_input.txt');
     final lines = await file.readAsLines();
     final result = part1(lines);
+    print(result);
     expect(result, allOf(lessThan(3416), greaterThan(1736)));
   });
 
   test('part2', () {
-    final lines = ''''''.split('\n');
+    final lines = '''MMMSXXMASM
+MSAMXMSMSA
+AMXSXMAAMM
+MSAMASMSMX
+XMASAMXAMM
+XXAMMXXAMA
+SMSMSASXSS
+SAXAMASAAA
+MAMMMXMMMM
+MXMXAXMASX'''
+        .split('\n');
     final result = part2(lines);
+    expect(result, 9);
+  });
+
+    test('part 2 with real input', () async {
+    final file = File('day4_input.txt');
+    final lines = await file.readAsLines();
+    final result = part2(lines);
+    print(result);
     expect(result, 0);
   });
 }
