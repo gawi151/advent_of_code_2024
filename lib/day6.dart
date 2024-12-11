@@ -1,6 +1,7 @@
 // If there is something directly in front of you, turn right 90 degrees.
 // Otherwise, take a step forward.
 import 'package:collection/collection.dart';
+import 'dart:isolate';
 
 typedef Pos = (int x, int y);
 
@@ -89,57 +90,121 @@ bool isInBounds(Pos pos, Pos max) {
 
 typedef Visited = (Pos pos, Direction dir);
 
-int part2(List<String> lines) {
-  final start = findStart(lines);
-  var possibleObstructionPositions = 0;
-  var checked = 0;
-  final totalPositions = lines.length * lines[0].length;
+typedef GridData = ({
+  Pos max,
+  Pos start,
+  Set<Pos> obstacles,
+  List<Pos> positionsToCheck,
+  int chunkIndex,
+  int totalChunks
+});
+
+typedef IsolateResult = ({
+  List<bool> results,
+  int chunkIndex,
+  Duration duration
+});
+
+void isolateFunction(List<dynamic> message) {
+  final sendPort = message[0] as SendPort;
+  final data = message[1] as GridData;
   final startTime = DateTime.now();
 
-  // Pre-compute grid boundaries
+  final results = <bool>[];
+  var loopsFound = 0;
+
+  for (var i = 0; i < data.positionsToCheck.length; i++) {
+    final pos = data.positionsToCheck[i];
+    final isLoop = willLoopOptimized(data.max, data.start, pos, data.obstacles);
+    if (isLoop) loopsFound++;
+    results.add(isLoop);
+
+    if ((i + 1) % 100 == 0) {
+      final progress =
+          ((i + 1) / data.positionsToCheck.length * 100).toStringAsFixed(1);
+      print(
+          'Chunk ${data.chunkIndex + 1}/${data.totalChunks}: $progress% - Loops found: $loopsFound');
+    }
+  }
+
+  final duration = DateTime.now().difference(startTime);
+  print(
+      'Chunk ${data.chunkIndex + 1}/${data.totalChunks} completed in ${duration.inSeconds}s - Found $loopsFound loops');
+
+  final result = (
+    results: results,
+    chunkIndex: data.chunkIndex,
+    duration: duration,
+  );
+  sendPort.send(result);
+}
+
+Future<int> part2(List<String> lines) async {
+  final start = findStart(lines);
+  final startTime = DateTime.now();
+
   final maxX = lines[0].length;
   final maxY = lines.length;
   final max = (maxX, maxY);
-
-  // Create a quick lookup for obstacles
   final obstacles = <Pos>{};
+  final positionsToCheck = <Pos>[];
+
   for (var y = 0; y < maxY; y++) {
     for (var x = 0; x < maxX; x++) {
+      final pos = (x, y);
       if (lines[y][x] == '#') {
-        obstacles.add((x, y));
+        obstacles.add(pos);
+      } else if (pos != start && lines[y][x] != '^') {
+        positionsToCheck.add(pos);
       }
     }
   }
 
-  for (var y = 0; y < lines.length; y++) {
-    for (var x = 0; x < lines[y].length; x++) {
-      checked++;
-      if (checked % 100 == 0) {
-        final progress = (checked / totalPositions * 100).toStringAsFixed(1);
-        final elapsed = DateTime.now().difference(startTime);
-        print(
-            'Progress: $progress% ($checked/$totalPositions) - Time elapsed: ${elapsed.inSeconds}s');
-      }
+  final numIsolates = 8;
+  final chunkSize = (positionsToCheck.length / numIsolates).ceil();
+  final chunks = <List<Pos>>[];
 
-      final obstructionPos = (x, y);
-      if (obstructionPos == start) continue;
-      if (obstacles.contains(obstructionPos)) continue;
-
-      if (willLoop(max, start, obstructionPos, obstacles)) {
-        possibleObstructionPositions++;
-        print(
-            'Found loop at ($x, $y) - Total loops found: $possibleObstructionPositions');
-      }
-    }
+  for (var i = 0; i < positionsToCheck.length; i += chunkSize) {
+    final end = (i + chunkSize < positionsToCheck.length)
+        ? i + chunkSize
+        : positionsToCheck.length;
+    chunks.add(positionsToCheck.sublist(i, end));
   }
+
+  final futures = chunks.asMap().entries.map((entry) async {
+    final receivePort = ReceivePort();
+    final data = (
+      max: max,
+      start: start,
+      obstacles: obstacles,
+      positionsToCheck: entry.value,
+      chunkIndex: entry.key,
+      totalChunks: chunks.length,
+    );
+
+    await Isolate.spawn(
+      isolateFunction,
+      [receivePort.sendPort, data],
+    );
+
+    final result = await receivePort.first as IsolateResult;
+    receivePort.close();
+    return result;
+  }).toList();
+
+  final results = await futures.wait;
+  final possibleObstructionPositions = results.fold(0, (sum, result) {
+    final loopsFound = result.results.where((b) => b).length;
+    return sum + loopsFound;
+  });
 
   final totalTime = DateTime.now().difference(startTime);
   print(
-      'Completed in ${totalTime.inSeconds}s - Found $possibleObstructionPositions possible positions');
+      '\nAll chunks completed in ${totalTime.inSeconds}s - Found $possibleObstructionPositions possible positions');
   return possibleObstructionPositions;
 }
 
-bool willLoop(
+bool willLoopOptimized(
   Pos max,
   Pos start,
   Pos obstruction,

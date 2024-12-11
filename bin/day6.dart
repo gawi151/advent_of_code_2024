@@ -8,6 +8,6 @@ void main(List<String> arguments) async {
   final part1Result = part1(lines);
   print('Part 1: $part1Result');
 
-  final part2Result = part2(lines);
+  final part2Result = await part2(lines);
   print('Part 2: $part2Result');
 }

@@ -26,7 +26,7 @@ void main() {
     expect(result, 5534);
   });
 
-  test('part2', () {
+  test('part2', () async {
     final lines = '''....#.....
 .........#
 ..........
@@ -37,14 +37,14 @@ void main() {
 ........#.
 #.........
 ......#...'''.split('\n');
-    final result = part2(lines);
+    final result = await part2(lines);
     expect(result, 6);
   });
 
   test('part2 with real input', () async {
     final file = File('day6_input.txt');
     final lines = await file.readAsLines();
-    final result = part2(lines);
+    final result = await part2(lines);
     expect(result, 2262);
   });
 }
